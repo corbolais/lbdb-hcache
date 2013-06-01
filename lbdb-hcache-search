@@ -22,10 +22,14 @@ import sqlite3
 import sys
 import os
 import argparse
+import codecs
+
+UTF8Writer = codecs.getwriter('utf8')
+sys.stdout = UTF8Writer(sys.stdout)
 
 defaultpath=os.path.expanduser("~/.mutt/address.db")
 parser = argparse.ArgumentParser(description='Search for addresses from hcache')
-parser.add_argument('terms', metavar='T', type=str, nargs='+',
+parser.add_argument('terms', metavar='T', type=unicode, nargs='+',
                    help='search terms')
 parser.add_argument('--address-db', dest='dbpath',
                     default=defaultpath,
@@ -38,12 +42,12 @@ sqlconn = sqlite3.connect(args.dbpath)
 clauses = []
 parameters = []
 for a in args.terms:
-    clauses.append("(name LIKE ? OR email LIKE ?)")
-    match = "%%%s%%" % a
+    clauses.append(u"(name LIKE ? OR email LIKE ?)")
+    match = u"%%%s%%" % a
     parameters.append(match)
     parameters.append(match)
 
-sql = "select name, email, count(email) AS occurances from addresses WHERE %s GROUP BY email ORDER BY occurances ASC" % (" AND ".join(clauses))
+sql = u"select name, email, count(email) AS occurances from addresses WHERE %s GROUP BY email ORDER BY occurances ASC" % (u" AND ".join(clauses))
 res = sqlconn.execute(sql, parameters)
 for r in res.fetchall():
-    print "%-30s\t%-30s\t(hcache, %d occurrances)" % (r[1], r[0], r[2])
+    print u"%-30s\t%-30s\t(hcache, %d occurrances)" % (r[1], r[0], r[2])
