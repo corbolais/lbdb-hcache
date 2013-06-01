@@ -21,5 +21,7 @@ m_hcache_query ()
     if [ "" != "$HCACHE_ADDRESS_DB" ]; then
 	EXTRA_ARGS="--address-db $HCACHE_ADDRESS_DB"
     fi
-    lbdb-hcache-search $EXTRA_ARGS $@
+    if [ "" != "${@}" ]; then
+	lbdb-hcache-search $EXTRA_ARGS $@
+    fi
 }
