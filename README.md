@@ -51,3 +51,13 @@ commonly seen addresses are shown at the top.
 
 If the database is in a location different to the default, this can
 be specified with HCACHE_ADDRESS_DB in ~/.lbdbrc.
+
+# Note
+
+This package was developed against the debian mutt package. As such,
+the offsets in the tokyocabinet entries are those used by this
+package. In particular, the size of the HEADER structure depends on
+whether USE_POP, USE_IMAP and MIXMASTER. In debian they all are.
+
+Additionally, the number of fields to read for each address changes
+whether EXACT_ADDRESS is defined. In debian it is not.
