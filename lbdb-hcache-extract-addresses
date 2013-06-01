@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+#     lbdb-hcache-extract-addresses - Scan header cache for addresses and
+#     insert them into address database
+#
+#     Copyright (C) 2013 Ivan Kelly <ivan@ivankelly.net>
+#
+#     This program is free software; you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation; either version 2 of the License, or
+#     (at your option) any later version.
+# 
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+# 
+#     You should have received a copy of the GNU General Public License
+#     along with this program; if not, write to the Free Software Foundation,
+#     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+
+from pytc import *
+import sqlite3
+import struct
+import StringIO
+import datetime
+import sys
+import os
+import argparse
+
+defaultdb=os.path.expanduser("~/.mutt/address.db")
+defaulthcache = os.path.expanduser("~/.mutt/cache/headers")
+
+parser = argparse.ArgumentParser(
+    description='Scan header cache for addresses and insert them into address database')
+parser.add_argument('--address-db', dest='dbpath',
+                    default=defaultdb,
+                    help='Address database to use (default:%s)' % (defaultdb))
+parser.add_argument('--hcache', dest='hcache',
+                    default=defaulthcache,
+                    help='Header cache to use (default:%s)' % (defaulthcache))
+args = parser.parse_args()
+
+def dump_char(f):
+    size = struct.unpack('i', f.read(4))[0]
+    #print "size %d" % size
+    if size != 0:
+        return f.read(size).decode('utf-8')
+    else:
+        return None
+
+def dump_addresses(data):
+    f = StringIO.StringIO(data)
+    f.seek(172)
+
+    addresses = []
+    for i in range(0,8):
+        num_addr = struct.unpack('i', f.read(4))
+
+        for i in range(0, num_addr[0]):
+            name = dump_char(f)
+            address = dump_char(f)
+            if name:
+                addresses.append((name, address))
+            f.read(4)
+    return addresses
+
+bdb = BDB()
+
+sqlconn = sqlite3.connect(args.dbpath)
+if sqlconn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='addresses';").fetchone() == None:
+    sqlconn.execute("create table addresses (name text, email text, key text, primary key (key, email))")
+try:
+    bdb.open(args.hcache, BDBONOLCK | BDBOREADER)
+except:
+    print >> sys.stderr, "Couldn't open header cache %s" % (args.hcache)
+
+for k in bdb:
+    try:
+        addresses = dump_addresses(bdb.get(k))
+        for a in addresses:
+            try:
+                sqlconn.execute("INSERT INTO addresses (name, email, key) VALUES(?, ?, ?)", (a[0], a[1], k))
+            except sqlite3.IntegrityError:
+                pass # dupe, ignore
+
+    except struct.error:
+        pass #this interests me not // it's not a cache entry
+sqlconn.commit()
+sqlconn.close()
+bdb.close()

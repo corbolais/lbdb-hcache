@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+#     lbdb-hcache-search - Search for addresses from hcache
+#
+#     Copyright (C) 2013 Ivan Kelly <ivan@ivankelly.net>
+#
+#     This program is free software; you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation; either version 2 of the License, or
+#     (at your option) any later version.
+# 
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+# 
+#     You should have received a copy of the GNU General Public License
+#     along with this program; if not, write to the Free Software Foundation,
+#     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+
+import sqlite3
+import sys
+import os
+import argparse
+
+defaultpath=os.path.expanduser("~/.mutt/address.db")
+parser = argparse.ArgumentParser(description='Search for addresses from hcache')
+parser.add_argument('terms', metavar='T', type=str, nargs='+',
+                   help='search terms')
+parser.add_argument('--address-db', dest='dbpath',
+                    default=defaultpath,
+                    help='Address database to use (default:%s)' % (defaultpath))
+
+args = parser.parse_args()
+
+sqlconn = sqlite3.connect(args.dbpath)
+
+clauses = []
+parameters = []
+for a in args.terms:
+    clauses.append("(name LIKE ? OR email LIKE ?)")
+    match = "%%%s%%" % a
+    parameters.append(match)
+    parameters.append(match)
+
+sql = "select name, email, count(email) AS occurances from addresses WHERE %s GROUP BY email ORDER BY occurances ASC" % (" AND ".join(clauses))
+res = sqlconn.execute(sql, parameters)
+for r in res.fetchall():
+    print "%-30s\t%-30s\t(hcache, %d occurrances)" % (r[1], r[0], r[2])
